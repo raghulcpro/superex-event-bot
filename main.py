@@ -1,11 +1,12 @@
-from pyrogram.client import Client
-from pyrogram import filters
+from pyrogram import Client, filters
 from datetime import datetime
 from config import API_ID, API_HASH, BOT_TOKEN, ADMIN_ID
 from database import cursor, conn
 
+# I changed the name below to "superex_bot_v2" 
+# This forces the bot to create a NEW login key and fixes the error!
 app = Client(
-    "event_bot",
+    "superex_bot_v2",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
@@ -17,8 +18,9 @@ def today():
 def message_link(chat_id, msg_id):
     return f"https://t.me/c/{str(chat_id)[4:]}/{msg_id}"
 
+# This makes the bot listen to Groups
 @app.on_message(filters.group)
-def collect_tasks(client, message):
+async def collect_tasks(client, message):
     text = (message.text or message.caption or "").lower()
     user = message.from_user
     if not user:
@@ -26,6 +28,7 @@ def collect_tasks(client, message):
 
     task = None
 
+    # Check for keywords
     if "#trade" in text or "#pnl" in text:
         if message.photo or message.document:
             task = "trade"
@@ -44,6 +47,7 @@ def collect_tasks(client, message):
     elif "x.com" in text or "twitter.com" in text:
         task = "twitter"
 
+    # If a task is found, save it and reply
     if task:
         link = message_link(message.chat.id, message.id)
         cursor.execute(
@@ -51,9 +55,12 @@ def collect_tasks(client, message):
             (user.id, user.username, today(), task, link)
         )
         conn.commit()
+        # This sends the confirmation message to your group
+        await message.reply_text(f"✅ **{task.capitalize()}** saved! Points added.")
 
+# This is the Admin command to check points
 @app.on_message(filters.command("today") & filters.private)
-def daily_report(client, message):
+async def daily_report(client, message):
     if message.from_user.id != ADMIN_ID:
         return
 
@@ -64,10 +71,10 @@ def daily_report(client, message):
 
     rows = cursor.fetchall()
     if not rows:
-        message.reply("No data for today.")
+        await message.reply("No data for today.")
         return
 
-    report = "📊 DAILY EVENT REPORT\n\n"
+    report = "📊 **DAILY EVENT REPORT**\n\n"
     data = {}
 
     for username, task, link in rows:
@@ -78,27 +85,26 @@ def daily_report(client, message):
         trade_count = len(tasks.get("trade", []))
 
         if trade_count:
-            if trade_count == 1:
-                pts = 3
-            elif trade_count <= 3:
-                pts = 5
-            elif trade_count <= 6:
-                pts = 7
-            else:
-                pts = 8
-            report += f"#trade ×{trade_count} → {pts} pts\n"
+            if trade_count == 1: pts = 3
+            elif trade_count <= 3: pts = 5
+            elif trade_count <= 6: pts = 7
+            else: pts = 8
+            report += f"• #trade ×{trade_count} → {pts} pts\n"
 
         if "analysis" in tasks:
-            report += "#analysis ×1 → 2 pts\n"
+            report += "• #analysis ×1 → 2 pts\n"
 
         if "signal" in tasks:
-            report += f"#signal ×{len(tasks['signal'])} → {len(tasks['signal'])} pts\n"
+            count = len(tasks['signal'])
+            report += f"• #signal ×{count} → {count} pts\n"
 
         if "twitter" in tasks:
-            report += f"X Post ×{len(tasks['twitter'])} → {len(tasks['twitter']) * 2} pts\n"
+            count = len(tasks['twitter'])
+            report += f"• X Post ×{count} → {count * 2} pts\n"
 
         report += "\n"
 
-    client.send_message(ADMIN_ID, report)
+    await client.send_message(ADMIN_ID, report)
 
-app.run()
+if __name__ == "__main__":
+    app.run()
