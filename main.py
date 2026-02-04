@@ -5,9 +5,9 @@ from pyrogram import Client, filters
 from config import API_ID, API_HASH, BOT_TOKEN, ADMIN_ID
 from database import cursor, conn, get_ist_now, get_today_str
 
-# --- VERSION 5 (Fixes Warnings & Connection) ---
+# --- VERSION 6 (FINAL FIX) ---
 app = Client(
-    "superex_event_bot_v5", 
+    "superex_event_bot_v6",  # <--- CHANGED TO V6
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
@@ -39,7 +39,7 @@ def count_valid_tasks(user_id, task_type, period="daily"):
     return cursor.fetchone()[0]
 
 def log_activity(user, task, link, status, reason=""):
-    # FIX: Convert date to String to stop DeprecationWarning
+    # FIX: Explicitly convert to string to kill DeprecationWarning
     timestamp_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "INSERT INTO activity_log (user_id, username, task_type, message_link, status, reason, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
